@@ -1,4 +1,4 @@
-import fs from 'node:fs/promises';
+import { open } from 'node:fs/promises';
 
 import execa from 'execa';
 
@@ -41,12 +41,17 @@ export class ScreenkittenAndroid implements Screenkitten {
         ? ['exec-out', 'screencap', '-p']
         : ['-s', deviceId, 'exec-out', 'screencap', '-p'];
 
-      const result = await execa(this.adbPath, args, {
-        encoding: null, // Return buffer for binary data
-        signal: options.abortSignal
-      } as any); // Type assertion to bypass outdated definitions
+      const fileHandle = await open(outputPath, 'w');
 
-      await fs.writeFile(outputPath, result.stdout);
+      try {
+        await execa(this.adbPath, args, {
+          stdout: fileHandle.fd,
+          signal: options.abortSignal
+        } as any);
+      } finally {
+        await fileHandle.close();
+      }
+
       return outputPath;
     } catch (error) {
       const screenshotError = this._classifyError(error, deviceId, outputPath);
